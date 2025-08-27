@@ -2,7 +2,16 @@ import { useChat } from "../hooks/useChat";
 import { VoiceInput } from "./VoiceInput";
 
 export const UI = ({ hidden, ...props }) => {
-  const { cameraZoomed, setCameraZoomed } = useChat();
+  const {
+    cameraZoomed,
+    setCameraZoomed,
+    template,
+    interviewQuestions,
+    currentQuestionIndex,
+    interviewStarted,
+    waitingForAnswer,
+    preparationPhase,
+  } = useChat();
   if (hidden) {
     return null;
   }
@@ -12,7 +21,41 @@ export const UI = ({ hidden, ...props }) => {
       <div className="fixed top-0 left-0 right-0 bottom-0 z-10 flex justify-between p-4 flex-col pointer-events-none">
         <div className="self-start backdrop-blur-md bg-white bg-opacity-50 p-4 rounded-lg">
           <h1 className="font-black text-xl">AI Interviewer 🤖</h1>
-          <p>Speak to start your interview session</p>
+          {template ? (
+            <div>
+              <p className="text-sm text-gray-700 mb-1">{template.name}</p>
+              {interviewStarted && interviewQuestions.length > 0 && (
+                <div className="text-xs text-gray-600">
+                  Question {currentQuestionIndex + 1} of{" "}
+                  {interviewQuestions.length}
+                  <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
+                    <div
+                      className="bg-blue-500 h-1.5 rounded-full transition-all duration-300"
+                      style={{
+                        width: `${
+                          ((currentQuestionIndex + 1) /
+                            interviewQuestions.length) *
+                          100
+                        }%`,
+                      }}
+                    ></div>
+                  </div>
+                  {preparationPhase && (
+                    <div className="text-blue-600 font-medium mt-1">
+                      🧠 Preparation time... (10s to think)
+                    </div>
+                  )}
+                  {waitingForAnswer && !preparationPhase && (
+                    <div className="text-orange-600 font-medium mt-1">
+                      ⏰ Speak your answer... (5s timeout)
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <p>Speak to start your interview session</p>
+          )}
         </div>
         <div className="w-full flex flex-col items-end justify-center gap-4">
           <button

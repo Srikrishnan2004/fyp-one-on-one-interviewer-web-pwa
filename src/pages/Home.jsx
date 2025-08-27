@@ -1,244 +1,272 @@
-import React, { useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { PWAInstallPrompt } from "../components/PWAInstallPrompt";
+import { ResumeUpload } from "../components/ResumeUpload";
 
-const categories = [
-  {
-    key: "language",
-    title: "Programming Languages",
-    description: "JavaScript, Python, Java, C++, C#, Go, Rust, TypeScript.",
-  },
-  {
-    key: "framework",
-    title: "Framework-based Questions",
-    description: "React, Angular, Vue, Next.js.",
-  },
-  {
-    key: "skills",
-    title: "Skill & Tools Questions",
-    description: "Git, Docker, CI/CD, Cloud, and others.",
-  },
-  {
-    key: "data",
-    title: "Data & Algorithms",
-    description: "DSA, SQL, NoSQL, and system design.",
-  },
-];
-
-export default function Home() {
+const Home = () => {
   const navigate = useNavigate();
-  const [activeCategory, setActiveCategory] = useState(null);
+  const [templates, setTemplates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filteredTemplates, setFilteredTemplates] = useState([]);
 
-  const categoryStyles = useMemo(
-    () => ({
-      language: {
-        bg: "from-rose-500 via-pink-500 to-fuchsia-500",
-        ring: "ring-rose-300/60",
-        badge: "from-rose-200 to-pink-200",
-      },
-      framework: {
-        bg: "from-indigo-500 via-violet-500 to-purple-500",
-        ring: "ring-indigo-300/60",
-        badge: "from-indigo-200 to-violet-200",
-      },
-      skills: {
-        bg: "from-emerald-500 via-teal-500 to-cyan-500",
-        ring: "ring-emerald-300/60",
-        badge: "from-emerald-200 to-teal-200",
-      },
-      data: {
-        bg: "from-amber-500 via-orange-500 to-red-500",
-        ring: "ring-amber-300/60",
-        badge: "from-amber-200 to-orange-200",
-      },
-    }),
-    []
-  );
+  const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
-  const optionsByCategory = useMemo(
-    () => ({
-      language: [
-        { key: "javascript", label: "JavaScript" },
-        { key: "typescript", label: "TypeScript" },
-        { key: "python", label: "Python" },
-        { key: "java", label: "Java" },
-        { key: "cpp", label: "C++" },
-        { key: "csharp", label: "C#" },
-        { key: "go", label: "Go" },
-        { key: "rust", label: "Rust" },
-      ],
-      framework: [
-        { key: "react", label: "React" },
-        { key: "nextjs", label: "Next.js" },
-        { key: "angular", label: "Angular" },
-        { key: "vue", label: "Vue" },
-        { key: "node", label: "Node.js" },
-        { key: "express", label: "Express" },
-      ],
-      skills: [
-        { key: "git", label: "Git" },
-        { key: "docker", label: "Docker" },
-        { key: "kubernetes", label: "Kubernetes" },
-        { key: "ci-cd", label: "CI/CD" },
-        { key: "aws", label: "AWS" },
-        { key: "gcp", label: "GCP" },
-        { key: "azure", label: "Azure" },
-      ],
-      data: [
-        { key: "dsa", label: "Data Structures & Algorithms" },
-        { key: "sql", label: "SQL" },
-        { key: "nosql", label: "NoSQL" },
-        { key: "system-design", label: "System Design" },
-      ],
-    }),
-    []
-  );
+  useEffect(() => {
+    fetchTemplates();
+  }, []);
 
-  const openCategory = (categoryKey) => {
-    setActiveCategory(categoryKey);
+  useEffect(() => {
+    if (searchQuery) {
+      const filtered = templates.filter(
+        (template) =>
+          template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          template.description.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredTemplates(filtered);
+    } else {
+      setFilteredTemplates(templates);
+    }
+  }, [searchQuery, templates]);
+
+  const fetchTemplates = async () => {
+    try {
+      const response = await fetch(`${backendUrl}/interview/templates`);
+      const data = await response.json();
+      if (data.success) {
+        setTemplates(data.templates);
+        setFilteredTemplates(data.templates);
+      }
+    } catch (error) {
+      console.error("Error fetching templates:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSelect = (optionKey) => {
-    const categoryKey = activeCategory;
-    setActiveCategory(null);
-    navigate(`/interview?category=${categoryKey}&topic=${optionKey}`);
+  const startInterview = () => {
+    if (selectedTemplate) {
+      navigate("/interview", { state: { template: selectedTemplate } });
+    }
   };
+
+  const handleResumeAnalyzed = (resumeTemplate) => {
+    setSelectedTemplate(resumeTemplate);
+  };
+
+  const groupedTemplates = filteredTemplates.reduce((acc, template) => {
+    if (!acc[template.category]) {
+      acc[template.category] = [];
+    }
+    acc[template.category].push(template);
+    return acc;
+  }, {});
+
+  const categoryIcons = {
+    languages: "🚀",
+    frameworks: "⚛️",
+    databases: "🗄️",
+    resume: "📄",
+  };
+
+  const categoryDescriptions = {
+    languages: "Programming language fundamentals",
+    frameworks: "Web frameworks and libraries",
+    databases: "Database design and optimization",
+    resume: "Resume-based behavioral and technical questions",
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-pink-800 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
+          <p className="text-white text-xl">Loading Interview Templates...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center px-6 py-10">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="text-center mb-10"
-      >
-        <h1 className="text-4xl md:text-6xl font-black tracking-tight text-gray-900/90 drop-shadow-sm">
-          Virtual AI Interviewer
-        </h1>
-        <p className="mt-3 text-base md:text-lg text-gray-700">
-          Choose a category to start your tailored interview.
-        </p>
-      </motion.div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-pink-800">
+      <PWAInstallPrompt />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 max-w-6xl w-full">
-        {categories.map((item, index) => (
-          <motion.button
-            key={item.key}
-            onClick={() => openCategory(item.key)}
-            initial={{ opacity: 0, y: 30, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ delay: 0.05 * index, duration: 0.45, ease: "easeOut" }}
-            whileHover={{ y: -8, scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className={`group relative overflow-hidden rounded-2xl p-6 text-left shadow-lg shadow-black/20 ring-1 ${
-              categoryStyles[item.key]?.ring || "ring-white/50"
-            }`}
-          >
-            <div
-              className={`absolute inset-0 bg-gradient-to-br ${
-                categoryStyles[item.key]?.bg || "from-pink-400 to-violet-400"
-              }`}
+      {/* Header */}
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center mb-12">
+          <h1 className="text-5xl font-bold text-white mb-4">
+            AI Interviewer 🤖
+          </h1>
+          <p className="text-xl text-blue-200 mb-8">
+            Practice with an intelligent AI interviewer using voice interaction
+          </p>
+
+          {/* Search Bar */}
+          <div className="max-w-md mx-auto mb-8">
+            <input
+              type="text"
+              placeholder="Search interview templates..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-4 py-3 rounded-lg bg-white bg-opacity-20 backdrop-blur-md text-white placeholder-blue-200 border border-white border-opacity-30 focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 0.25 }}
-              transition={{ duration: 0.8, delay: 0.15 * index }}
-              className="pointer-events-none absolute -top-10 -right-10 h-40 w-40 rounded-full bg-white/30 blur-2xl"
-            />
-            <div className="relative">
-              <div className="flex items-start justify-between">
-                <h2 className="text-lg md:text-xl font-semibold text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.35)]">
-                  {item.title}
-                </h2>
-                <span className={`ml-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br ${
-                  categoryStyles[item.key]?.badge || "from-pink-200 to-violet-200"
-                } text-gray-900 text-sm font-bold shadow-sm ring-1 ring-black/10`}>
-                  {index + 1}
-                </span>
-              </div>
-              <p className="mt-2 text-sm text-white/95 drop-shadow-[0_1px_1px_rgba(0,0,0,0.35)]">{item.description}</p>
-              <div className="mt-5 inline-flex items-center text-sm font-semibold text-white/95 drop-shadow-[0_1px_1px_rgba(0,0,0,0.35)]">
-                Start
-                <svg
-                  className="ml-2 h-4 w-4 opacity-90 group-hover:translate-x-0.5 transition-transform"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </svg>
-              </div>
-            </div>
-          </motion.button>
-        ))}
-      </div>
+          </div>
+        </div>
 
-      <motion.p
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 0.9 }}
-        transition={{ delay: 0.4, duration: 0.6 }}
-        className="mt-10 text-xs text-gray-700/80"
-      >
-        Tip: You can install this as a PWA from your browser menu.
-      </motion.p>
-
-      {activeCategory && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
-        >
-          <div
-            className="absolute inset-0 bg-black/30 backdrop-blur-[1px]"
-            onClick={() => setActiveCategory(null)}
+        {/* Resume Upload for Resume Templates */}
+        {selectedTemplate?.category === "resume" && (
+          <ResumeUpload
+            template={selectedTemplate}
+            onResumeAnalyzed={handleResumeAnalyzed}
           />
+        )}
 
-          <motion.div
-            initial={{ y: 40, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ type: "spring", stiffness: 220, damping: 22 }}
-            className="relative z-10 w-full sm:max-w-xl mx-auto rounded-t-3xl sm:rounded-3xl bg-white/90 backdrop-blur-md border border-white/60 shadow-xl p-6"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900/90">
-                {categories.find((c) => c.key === activeCategory)?.title}
-              </h3>
-              <button
-                onClick={() => setActiveCategory(null)}
-                className="h-8 w-8 inline-flex items-center justify-center rounded-full hover:bg-black/5 text-gray-800"
-                aria-label="Close"
+        {/* Template Categories */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
+          {Object.entries(groupedTemplates).map(
+            ([category, categoryTemplates]) => (
+              <div
+                key={category}
+                className="bg-white bg-opacity-10 backdrop-blur-md rounded-xl p-6 border border-white border-opacity-20"
               >
-                ×
+                <div className="flex items-center mb-4">
+                  <span className="text-3xl mr-3">
+                    {categoryIcons[category]}
+                  </span>
+                  <div>
+                    <h2 className="text-2xl font-bold text-white capitalize">
+                      {category}
+                    </h2>
+                    <p className="text-sm text-blue-200">
+                      {categoryDescriptions[category]}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {categoryTemplates.map((template) => (
+                    <div
+                      key={template.key}
+                      onClick={() => setSelectedTemplate(template)}
+                      className={`p-4 rounded-lg cursor-pointer transition-all duration-200 ${
+                        selectedTemplate?.key === template.key
+                          ? "bg-blue-500 bg-opacity-50 border-2 border-blue-300"
+                          : "bg-white bg-opacity-10 hover:bg-opacity-20 border border-white border-opacity-20"
+                      }`}
+                    >
+                      <h3 className="text-lg font-semibold text-white mb-2">
+                        {template.name}
+                      </h3>
+                      <p className="text-sm text-blue-200 line-clamp-2">
+                        {template.description}
+                      </p>
+                      {selectedTemplate?.key === template.key && (
+                        <div className="mt-3">
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-500 text-white">
+                            ✓ Selected
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          )}
+        </div>
+
+        {/* Selected Template Info */}
+        {selectedTemplate && (
+          <div className="mt-12 bg-white bg-opacity-10 backdrop-blur-md rounded-xl p-6 border border-white border-opacity-20">
+            <div className="flex flex-col md:flex-row items-center justify-between">
+              <div className="mb-4 md:mb-0">
+                <h3 className="text-2xl font-bold text-white mb-2">
+                  Ready to start: {selectedTemplate.name}
+                </h3>
+                <p className="text-blue-200">{selectedTemplate.description}</p>
+                <div className="mt-2 flex items-center space-x-4 text-sm text-blue-300">
+                  <span>📊 Model: {selectedTemplate.model}</span>
+                  <span>🏷️ Category: {selectedTemplate.category}</span>
+                </div>
+              </div>
+              <button
+                onClick={startInterview}
+                className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white px-8 py-4 rounded-lg font-semibold text-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+              >
+                🎤 Start Voice Interview
               </button>
             </div>
+          </div>
+        )}
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {(optionsByCategory[activeCategory] || []).map((opt, i) => (
-                <motion.button
-                  key={opt.key}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.03 * i }}
-                  onClick={() => handleSelect(opt.key)}
-                  className={`rounded-xl border border-black/10 bg-white/85 hover:bg-white text-gray-900/90 text-sm font-medium px-3 py-2 text-left shadow-sm ring-1 ${
-                    categoryStyles[activeCategory]?.ring || "ring-black/10"
-                  }`}
-                >
-                  {opt.label}
-                </motion.button>
-              ))}
+        {/* Stats */}
+        <div className="mt-12 text-center">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white bg-opacity-10 backdrop-blur-md rounded-lg p-4">
+              <div className="text-2xl font-bold text-white">
+                {templates.length}
+              </div>
+              <div className="text-sm text-blue-200">Total Templates</div>
             </div>
+            <div className="bg-white bg-opacity-10 backdrop-blur-md rounded-lg p-4">
+              <div className="text-2xl font-bold text-white">
+                {Object.keys(groupedTemplates).length}
+              </div>
+              <div className="text-sm text-blue-200">Categories</div>
+            </div>
+            <div className="bg-white bg-opacity-10 backdrop-blur-md rounded-lg p-4">
+              <div className="text-2xl font-bold text-white">🎤</div>
+              <div className="text-sm text-blue-200">Voice Enabled</div>
+            </div>
+            <div className="bg-white bg-opacity-10 backdrop-blur-md rounded-lg p-4">
+              <div className="text-2xl font-bold text-white">🤖</div>
+              <div className="text-sm text-blue-200">AI Powered</div>
+            </div>
+          </div>
+        </div>
 
-            <div className="mt-5 text-[11px] text-gray-700/80">
-              Pick one to start a tailored interview.
+        {/* Features */}
+        <div className="mt-12 text-center">
+          <h2 className="text-3xl font-bold text-white mb-8">
+            Why Choose AI Interviewer?
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white bg-opacity-10 backdrop-blur-md rounded-xl p-6">
+              <div className="text-4xl mb-4">🎤</div>
+              <h3 className="text-xl font-semibold text-white mb-3">
+                Voice Interaction
+              </h3>
+              <p className="text-blue-200">
+                Natural conversation with real-time speech recognition and live
+                captions
+              </p>
             </div>
-          </motion.div>
-        </motion.div>
-      )}
+            <div className="bg-white bg-opacity-10 backdrop-blur-md rounded-xl p-6">
+              <div className="text-4xl mb-4">🧠</div>
+              <h3 className="text-xl font-semibold text-white mb-3">
+                AI-Powered
+              </h3>
+              <p className="text-blue-200">
+                Advanced AI generates contextual questions based on your
+                responses
+              </p>
+            </div>
+            <div className="bg-white bg-opacity-10 backdrop-blur-md rounded-xl p-6">
+              <div className="text-4xl mb-4">🎯</div>
+              <h3 className="text-xl font-semibold text-white mb-3">
+                Targeted Practice
+              </h3>
+              <p className="text-blue-200">
+                23+ specialized templates covering languages, frameworks, and
+                more
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
-}
+};
 
-
+export default Home;

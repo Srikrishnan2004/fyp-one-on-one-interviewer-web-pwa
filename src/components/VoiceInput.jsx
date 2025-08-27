@@ -6,7 +6,8 @@ import SpeechRecognition, {
 import { useChat } from "../hooks/useChat";
 
 export const VoiceInput = () => {
-  const { chat, loading, message } = useChat();
+  const { chat, loading, message, waitingForAnswer, preparationPhase } =
+    useChat();
   const [isListening, setIsListening] = useState(false);
   const [transcribedText, setTranscribedText] = useState("");
   const [showCaptions, setShowCaptions] = useState(false);
@@ -74,8 +75,8 @@ export const VoiceInput = () => {
     stopRecording();
     SpeechRecognition.stopListening();
 
-    // Send the transcribed text to backend if we have any
-    if (transcript.trim()) {
+    // Send the transcribed text to backend if we have any and we're waiting for an answer or in preparation phase
+    if (transcript.trim() && (waitingForAnswer || preparationPhase)) {
       chat(transcript);
       resetTranscript();
       setTranscribedText("");
@@ -94,7 +95,12 @@ export const VoiceInput = () => {
 
   const sendTextMessage = () => {
     const text = textInputRef.current.value.trim();
-    if (text && !loading && !message) {
+    if (
+      text &&
+      !loading &&
+      !message &&
+      (waitingForAnswer || preparationPhase)
+    ) {
       chat(text);
       textInputRef.current.value = "";
     }
@@ -167,16 +173,36 @@ export const VoiceInput = () => {
           <>
             <input
               ref={textInputRef}
-              className="flex-1 placeholder:text-gray-800 placeholder:italic p-4 rounded-md bg-opacity-50 bg-white backdrop-blur-md"
-              placeholder="Type your response..."
+              className={`flex-1 placeholder:text-gray-800 placeholder:italic p-4 rounded-md bg-opacity-50 backdrop-blur-md ${
+                waitingForAnswer || preparationPhase
+                  ? "bg-white"
+                  : "bg-gray-300"
+              }`}
+              placeholder={
+                preparationPhase
+                  ? "Type your response (or wait 10s)..."
+                  : waitingForAnswer
+                  ? "Type your response..."
+                  : "Wait for question..."
+              }
               onKeyDown={handleKeyDown}
-              disabled={loading || message}
+              disabled={
+                loading || message || (!waitingForAnswer && !preparationPhase)
+              }
             />
             <button
               onClick={sendTextMessage}
-              disabled={loading || message}
-              className={`bg-blue-500 hover:bg-blue-600 text-white p-4 px-6 font-semibold uppercase rounded-md ${
-                loading || message ? "cursor-not-allowed opacity-30" : ""
+              disabled={
+                loading || message || (!waitingForAnswer && !preparationPhase)
+              }
+              className={`${
+                waitingForAnswer || preparationPhase
+                  ? "bg-blue-500 hover:bg-blue-600"
+                  : "bg-gray-400 cursor-not-allowed"
+              } text-white p-4 px-6 font-semibold uppercase rounded-md ${
+                loading || message || (!waitingForAnswer && !preparationPhase)
+                  ? "cursor-not-allowed opacity-30"
+                  : ""
               }`}
             >
               Send
@@ -187,9 +213,17 @@ export const VoiceInput = () => {
             {/* Start Recording Button */}
             <button
               onClick={startListening}
-              disabled={loading || message}
-              className={`flex-1 bg-blue-500 hover:bg-blue-600 text-white p-4 rounded-md font-semibold uppercase flex items-center justify-center gap-2 ${
-                loading || message ? "cursor-not-allowed opacity-30" : ""
+              disabled={
+                loading || message || (!waitingForAnswer && !preparationPhase)
+              }
+              className={`flex-1 ${
+                waitingForAnswer || preparationPhase
+                  ? "bg-blue-500 hover:bg-blue-600"
+                  : "bg-gray-400 cursor-not-allowed"
+              } text-white p-4 rounded-md font-semibold uppercase flex items-center justify-center gap-2 ${
+                loading || message || (!waitingForAnswer && !preparationPhase)
+                  ? "cursor-not-allowed opacity-30"
+                  : ""
               }`}
             >
               <svg
@@ -203,10 +237,14 @@ export const VoiceInput = () => {
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"
+                  d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"
                 />
               </svg>
-              Start Speaking
+              {preparationPhase
+                ? "Start Answering Early"
+                : waitingForAnswer
+                ? "Start Speaking"
+                : "Wait for question..."}
             </button>
           </>
         ) : (
