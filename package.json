@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:test":"serve -s dist -l 3000",
     "preview": "vite preview",
     "build:pwa": "vite build && echo PWA build complete! Check dist/ folder",
     "serve:pwa": "vite preview --host 0.0.0.0 --port 3000"

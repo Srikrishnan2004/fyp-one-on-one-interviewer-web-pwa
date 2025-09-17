@@ -1,17 +1,25 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 import { PWAInstallPrompt } from "../components/PWAInstallPrompt";
 import { ResumeUpload } from "../components/ResumeUpload";
+import { Login } from "../components/Login";
+import { Register } from "../components/Register";
+import { UserDashboard } from "../components/UserDashboard";
 
 const Home = () => {
   const navigate = useNavigate();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredTemplates, setFilteredTemplates] = useState([]);
+  const [showLogin, setShowLogin] = useState(false);
+  const [showRegister, setShowRegister] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(false);
 
-  const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
+  const backendUrl = "http://localhost:5000";
 
   useEffect(() => {
     fetchTemplates();
@@ -46,6 +54,11 @@ const Home = () => {
   };
 
   const startInterview = () => {
+    if (!isAuthenticated) {
+      setShowLogin(true);
+      return;
+    }
+
     if (selectedTemplate) {
       navigate("/interview", { state: { template: selectedTemplate } });
     }
@@ -94,6 +107,39 @@ const Home = () => {
 
       {/* Header */}
       <div className="container mx-auto px-4 py-8">
+        {/* Authentication Header */}
+        <div className="flex justify-between items-center mb-8">
+          <div className="text-white text-lg font-semibold">AI Interviewer</div>
+          <div className="flex items-center space-x-4">
+            {isAuthenticated ? (
+              <>
+                <span className="text-white">Welcome, {user?.first_name}!</span>
+                <button
+                  onClick={() => setShowDashboard(true)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+                >
+                  Dashboard
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => setShowLogin(true)}
+                  className="text-white hover:text-blue-200 px-4 py-2 transition-colors"
+                >
+                  Sign In
+                </button>
+                <button
+                  onClick={() => setShowRegister(true)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+                >
+                  Sign Up
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
         <div className="text-center mb-12">
           <h1 className="text-5xl font-bold text-white mb-4">
             AI Interviewer 🤖
@@ -265,6 +311,31 @@ const Home = () => {
           </div>
         </div>
       </div>
+
+      {/* Authentication Modals */}
+      {showLogin && (
+        <Login
+          onClose={() => setShowLogin(false)}
+          onSwitchToRegister={() => {
+            setShowLogin(false);
+            setShowRegister(true);
+          }}
+        />
+      )}
+
+      {showRegister && (
+        <Register
+          onClose={() => setShowRegister(false)}
+          onSwitchToLogin={() => {
+            setShowRegister(false);
+            setShowLogin(true);
+          }}
+        />
+      )}
+
+      {showDashboard && (
+        <UserDashboard onClose={() => setShowDashboard(false)} />
+      )}
     </div>
   );
 };

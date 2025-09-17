@@ -1,4 +1,5 @@
 import { useChat } from "../hooks/useChat";
+import { useSession } from "../contexts/SessionContext";
 import { VoiceInput } from "./VoiceInput";
 
 export const UI = ({ hidden, ...props }) => {
@@ -11,10 +12,19 @@ export const UI = ({ hidden, ...props }) => {
     interviewStarted,
     waitingForAnswer,
     preparationPhase,
+    skipCurrentQuestion,
   } = useChat();
+
+  const { currentSession } = useSession();
+
   if (hidden) {
     return null;
   }
+
+  const progressPercentage =
+    interviewQuestions.length > 0
+      ? ((currentQuestionIndex + 1) / interviewQuestions.length) * 100
+      : 0;
 
   return (
     <>
@@ -24,6 +34,11 @@ export const UI = ({ hidden, ...props }) => {
           {template ? (
             <div>
               <p className="text-sm text-gray-700 mb-1">{template.name}</p>
+              {currentSession && (
+                <p className="text-xs text-gray-600 mb-2">
+                  Session: {currentSession.session_name}
+                </p>
+              )}
               {interviewStarted && interviewQuestions.length > 0 && (
                 <div className="text-xs text-gray-600">
                   Question {currentQuestionIndex + 1} of{" "}
@@ -46,8 +61,16 @@ export const UI = ({ hidden, ...props }) => {
                     </div>
                   )}
                   {waitingForAnswer && !preparationPhase && (
-                    <div className="text-orange-600 font-medium mt-1">
-                      ⏰ Speak your answer... (5s timeout)
+                    <div className="space-y-2">
+                      <div className="text-orange-600 font-medium">
+                        ⏰ Speak your answer... (5s timeout)
+                      </div>
+                      <button
+                        onClick={skipCurrentQuestion}
+                        className="pointer-events-auto text-xs bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded-md transition-colors"
+                      >
+                        Skip Question →
+                      </button>
                     </div>
                   )}
                 </div>

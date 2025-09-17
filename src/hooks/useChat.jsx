@@ -1,10 +1,39 @@
 import { createContext, useContext, useEffect, useState } from "react";
+import { useAuth } from "../contexts/AuthContext";
+import { useSession } from "../contexts/SessionContext";
 
-const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const backendUrl = "http://localhost:5000";
+
+// Helper function to normalize difficulty values
+const normalizeDifficulty = (difficulty) => {
+  const difficultyMap = {
+    easy: "easy",
+    medium: "medium",
+    intermediate: "medium", // Map intermediate to medium
+    hard: "hard",
+    difficult: "hard", // Map difficult to hard
+    advanced: "hard", // Map advanced to hard
+  };
+
+  return difficultyMap[difficulty?.toLowerCase()] || "medium";
+};
 
 const ChatContext = createContext();
 
 export const ChatProvider = ({ children, template }) => {
+  const { token } = useAuth();
+  const {
+    createSession,
+    startSession,
+    endSession,
+    updateQuestionCount,
+    createConversation,
+    submitAnswer,
+    createPerformanceRecord,
+    currentSession,
+    setCurrentSession,
+  } = useSession();
+
   const [messages, setMessages] = useState([]);
   const [message, setMessage] = useState();
   const [loading, setLoading] = useState(false);
@@ -20,6 +49,8 @@ export const ChatProvider = ({ children, template }) => {
   const [speakingTimeout, setSpeakingTimeout] = useState(null);
   const [isUserSpeaking, setIsUserSpeaking] = useState(false);
   const [isProcessingQuestion, setIsProcessingQuestion] = useState(false);
+  const [currentConversation, setCurrentConversation] = useState(null);
+  const [answerStartTime, setAnswerStartTime] = useState(null);
 
   // Initialize interview on load
   useEffect(() => {
@@ -32,6 +63,24 @@ export const ChatProvider = ({ children, template }) => {
     try {
       setLoading(true);
 
+      // First, create a session for this interview
+      const sessionResult = await createSession({
+        session_name: `${template.name} Interview`,
+        session_type: "interview",
+        session_metadata: {
+          template_key: template.key,
+          template_name: template.name,
+          template_category: template.category,
+        },
+      });
+
+      if (!sessionResult.success) {
+        throw new Error("Failed to create session");
+      }
+
+      // Start the session
+      await startSession(sessionResult.session.id);
+
       // Generate interview questions based on template
       const response = await fetch(`${backendUrl}/interview/generate`, {
         method: "POST",
@@ -41,6 +90,7 @@ export const ChatProvider = ({ children, template }) => {
         body: JSON.stringify({
           template: template.key,
           context: `Interview for ${template.name} position`,
+          includeAudio: true,
         }),
       });
 
@@ -49,8 +99,29 @@ export const ChatProvider = ({ children, template }) => {
       if (data.success && data.questions) {
         setInterviewQuestions(data.questions);
 
-        // Start directly with the first question from backend response
+        // Update session with total question count
+        await updateQuestionCount(
+          sessionResult.session.id,
+          data.questions.length,
+          0
+        );
+
+        // Create conversation record for the first question
         if (data.questions[0]) {
+          const conversationResult = await createConversation({
+            session_id: sessionResult.session.id,
+            question_number: 1,
+            question_text: data.questions[0].text,
+            question_category: data.questions[0].category || "general",
+            question_difficulty: normalizeDifficulty(
+              data.questions[0].difficulty
+            ),
+          });
+
+          if (conversationResult.success) {
+            setCurrentConversation(conversationResult.conversation);
+          }
+
           const firstQuestion = {
             text: data.questions[0].text,
             audio: data.questions[0].audio || null,
@@ -100,7 +171,48 @@ export const ChatProvider = ({ children, template }) => {
     setIsUserSpeaking(true);
     setUserAnswer(message);
 
-    // Move directly to next question without sending to backend
+    // Record the time taken to answer
+    const timeTaken = answerStartTime
+      ? (Date.now() - answerStartTime) / 1000
+      : 30;
+
+    // Submit the answer to the backend if we have a current conversation
+    if (currentConversation && currentSession) {
+      try {
+        await submitAnswer(currentConversation.id, {
+          user_answer: message,
+          time_taken_seconds: timeTaken,
+        });
+
+        // Update session progress
+        await updateQuestionCount(
+          currentSession.id,
+          interviewQuestions.length,
+          currentQuestionIndex + 1
+        );
+
+        // Create performance record
+        await createPerformanceRecord({
+          session_id: currentSession.id,
+          conversation_id: currentConversation.id,
+          metric_type: "response_time",
+          metric_value: timeTaken,
+          metric_max_value: 120.0,
+          metric_unit: "seconds",
+          performance_category: "efficiency",
+          feedback_notes:
+            timeTaken < 30
+              ? "Quick response"
+              : timeTaken < 60
+              ? "Good response time"
+              : "Consider being more concise",
+        });
+      } catch (error) {
+        console.error("Error submitting answer:", error);
+      }
+    }
+
+    // Move to next question
     await moveToNextQuestion();
   };
 
@@ -141,6 +253,7 @@ export const ChatProvider = ({ children, template }) => {
     setPreparationPhase(false);
     setWaitingForAnswer(true);
     setIsUserSpeaking(false);
+    setAnswerStartTime(Date.now()); // Record when the user can start answering
 
     // Start 5-second speaking timer
     startSpeakingTimer();
@@ -161,10 +274,88 @@ export const ChatProvider = ({ children, template }) => {
   };
 
   const handleSpeakingTimeout = async () => {
-    // User didn't continue speaking within 5 seconds, move to next question
-    if (!isProcessingQuestion) {
-      await moveToNextQuestion();
+    // User didn't continue speaking within 5 seconds
+    // Submit empty answer to track that question was presented but not answered
+    if (!isProcessingQuestion && currentConversation && currentSession) {
+      try {
+        const timeTaken = answerStartTime
+          ? (Date.now() - answerStartTime) / 1000
+          : 30;
+
+        await submitAnswer(currentConversation.id, {
+          user_answer: "", // Empty answer indicates no response
+          time_taken_seconds: timeTaken,
+        });
+
+        // Update session progress
+        await updateQuestionCount(
+          currentSession.id,
+          interviewQuestions.length,
+          currentQuestionIndex + 1
+        );
+
+        // Create performance record for skipped question
+        await createPerformanceRecord({
+          session_id: currentSession.id,
+          conversation_id: currentConversation.id,
+          metric_type: "response_time",
+          metric_value: timeTaken,
+          metric_max_value: 120.0,
+          metric_unit: "seconds",
+          performance_category: "engagement",
+          feedback_notes: "Question was skipped - no answer provided",
+          improvement_suggestions: "Try to provide an answer even if unsure",
+        });
+      } catch (error) {
+        console.error("Error submitting empty answer:", error);
+      }
     }
+
+    // Move to next question
+    await moveToNextQuestion();
+  };
+
+  const skipCurrentQuestion = async () => {
+    // Allow users to manually skip a question
+    if (currentConversation && currentSession && !isProcessingQuestion) {
+      try {
+        setIsProcessingQuestion(true);
+        const timeTaken = answerStartTime
+          ? (Date.now() - answerStartTime) / 1000
+          : 0;
+
+        await submitAnswer(currentConversation.id, {
+          user_answer: "", // Empty answer indicates intentional skip
+          time_taken_seconds: timeTaken,
+        });
+
+        // Update session progress
+        await updateQuestionCount(
+          currentSession.id,
+          interviewQuestions.length,
+          currentQuestionIndex + 1
+        );
+
+        // Create performance record for skipped question
+        await createPerformanceRecord({
+          session_id: currentSession.id,
+          conversation_id: currentConversation.id,
+          metric_type: "response_time",
+          metric_value: timeTaken,
+          metric_max_value: 120.0,
+          metric_unit: "seconds",
+          performance_category: "engagement",
+          feedback_notes: "Question was intentionally skipped by user",
+          improvement_suggestions:
+            "Consider attempting to answer even if uncertain",
+        });
+      } catch (error) {
+        console.error("Error skipping question:", error);
+      }
+    }
+
+    // Move to next question
+    await moveToNextQuestion();
   };
 
   const moveToNextQuestion = async () => {
@@ -173,8 +364,33 @@ export const ChatProvider = ({ children, template }) => {
 
       // Move to next question if we have more
       if (currentQuestionIndex < interviewQuestions.length - 1) {
-        setTimeout(() => {
-          const nextQuestion = interviewQuestions[currentQuestionIndex + 1];
+        setTimeout(async () => {
+          const nextQuestionIndex = currentQuestionIndex + 1;
+          const nextQuestion = interviewQuestions[nextQuestionIndex];
+
+          // Create conversation record for the next question
+          if (currentSession) {
+            try {
+              const conversationResult = await createConversation({
+                session_id: currentSession.id,
+                question_number: nextQuestionIndex + 1,
+                question_text: nextQuestion.text,
+                question_category: nextQuestion.category || "general",
+                question_difficulty: normalizeDifficulty(
+                  nextQuestion.difficulty
+                ),
+              });
+
+              if (conversationResult.success) {
+                setCurrentConversation(conversationResult.conversation);
+              }
+            } catch (error) {
+              console.error(
+                "Error creating conversation for next question:",
+                error
+              );
+            }
+          }
 
           // Use next question directly from backend response (should include audio/lipsync)
           const nextQuestionMessage = {
@@ -186,15 +402,37 @@ export const ChatProvider = ({ children, template }) => {
           };
 
           setMessages((prevMessages) => [...prevMessages, nextQuestionMessage]);
-
-          setCurrentQuestionIndex((prev) => prev + 1);
+          setCurrentQuestionIndex(nextQuestionIndex);
           setWaitingForAnswer(false);
         }, 2000); // 2 second delay before next question
       } else {
-        // Interview completed
-        setTimeout(() => {
+        // Interview completed - end session and show completion
+        setTimeout(async () => {
+          if (currentSession) {
+            try {
+              // End the current session
+              await endSession(currentSession.id);
+
+              // Create final performance summary
+              await createPerformanceRecord({
+                session_id: currentSession.id,
+                conversation_id: null,
+                metric_type: "interview_completion",
+                metric_value: 100.0,
+                metric_max_value: 100.0,
+                metric_unit: "percentage",
+                performance_category: "completion",
+                feedback_notes: "Interview completed successfully",
+                improvement_suggestions:
+                  "Great job completing the full interview!",
+              });
+            } catch (error) {
+              console.error("Error ending session:", error);
+            }
+          }
+
           const completionMessage = {
-            text: "That concludes our interview! Thank you for your time. You did great!",
+            text: "That concludes our interview! Thank you for your time. You did great! Your performance has been recorded and you can view it in your dashboard.",
             audio: null,
             lipsync: null,
             facialExpression: "smile",
@@ -271,6 +509,7 @@ export const ChatProvider = ({ children, template }) => {
         isProcessingQuestion,
         userAnswer,
         setUserAnswer,
+        skipCurrentQuestion,
       }}
     >
       {children}

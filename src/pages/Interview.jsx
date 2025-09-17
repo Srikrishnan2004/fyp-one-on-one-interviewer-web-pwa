@@ -2,6 +2,7 @@ import { Loader } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 import { Leva } from "leva";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 import { Experience } from "../components/Experience";
 import { UI } from "../components/UI";
 import { AudioPermissions } from "../components/AudioPermissions";
@@ -11,12 +12,31 @@ import { ChatProvider } from "../hooks/useChat";
 const Interview = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const template = location.state?.template;
+
+  // If not authenticated, redirect to home
+  if (!authLoading && !isAuthenticated) {
+    navigate("/");
+    return null;
+  }
 
   // If no template is selected, redirect to home
   if (!template) {
     navigate("/");
     return null;
+  }
+
+  // Show loading while checking authentication
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-pink-800 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
+          <p className="text-white text-xl">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   return (

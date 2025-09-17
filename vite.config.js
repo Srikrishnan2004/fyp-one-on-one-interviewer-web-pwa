@@ -4,12 +4,27 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom'],
+          'router': ['react-router-dom'],
+          'three': ['three', '@react-three/fiber', '@react-three/drei'],
+          'ui': ['framer-motion'],
+        }
+      }
+    },
+    chunkSizeWarningLimit: 1000
+  },
   plugins: [
     react(),
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,glb,fbx}'],
+        maximumFileSizeToCacheInBytes: 10 * 1024 * 1024, // 10MB limit
+        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        globIgnores: ['**/models/**', '**/*.{glb,fbx}'], // Exclude large 3D models
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -26,13 +41,25 @@ export default defineConfig({
             }
           },
           {
-            urlPattern: /\.(?:png|jpg|jpeg|svg|gif|glb|fbx)$/,
+            urlPattern: /\.(?:png|jpg|jpeg|svg|gif)$/,
             handler: 'CacheFirst',
             options: {
               cacheName: 'images-cache',
               expiration: {
                 maxEntries: 100,
                 maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+              }
+            }
+          },
+          {
+            urlPattern: /\.(?:glb|fbx)$/,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'models-cache',
+              networkTimeoutSeconds: 10,
+              expiration: {
+                maxEntries: 20,
+                maxAgeSeconds: 60 * 60 * 24 * 7 // 7 days
               }
             }
           }
