@@ -18,6 +18,14 @@ const normalizeDifficulty = (difficulty) => {
   return difficultyMap[difficulty?.toLowerCase()] || "medium";
 };
 
+// Helper function to ensure valid user answer for backend validation
+const normalizeUserAnswer = (answer) => {
+  if (!answer || answer.trim() === "") {
+    return "No answer provided";
+  }
+  return answer.trim();
+};
+
 const ChatContext = createContext();
 
 export const ChatProvider = ({ children, template }) => {
@@ -108,26 +116,28 @@ export const ChatProvider = ({ children, template }) => {
 
         // Create conversation record for the first question
         if (data.questions[0]) {
-          const conversationResult = await createConversation({
+          const questionData = data.questions[0];
+          const conversationData = {
             session_id: sessionResult.session.id,
             question_number: 1,
-            question_text: data.questions[0].text,
-            question_category: data.questions[0].category || "general",
-            question_difficulty: normalizeDifficulty(
-              data.questions[0].difficulty
-            ),
-          });
+            question_text: questionData.text,
+            question_category: questionData.category || "general",
+            question_difficulty: normalizeDifficulty(questionData.difficulty),
+          };
+
+          console.log("Creating conversation with data:", conversationData);
+          const conversationResult = await createConversation(conversationData);
 
           if (conversationResult.success) {
             setCurrentConversation(conversationResult.conversation);
           }
 
           const firstQuestion = {
-            text: data.questions[0].text,
-            audio: data.questions[0].audio || null,
-            lipsync: data.questions[0].lipsync || null,
-            facialExpression: data.questions[0].facialExpression || "default",
-            animation: data.questions[0].animation || "Talking_2",
+            text: questionData.text,
+            audio: questionData.audio || null,
+            lipsync: questionData.lipsync || null,
+            facialExpression: questionData.facialExpression || "default",
+            animation: questionData.animation || "Talking_2",
           };
           setMessages([firstQuestion]);
         }
@@ -180,7 +190,7 @@ export const ChatProvider = ({ children, template }) => {
     if (currentConversation && currentSession) {
       try {
         await submitAnswer(currentConversation.id, {
-          user_answer: message,
+          user_answer: normalizeUserAnswer(message),
           time_taken_seconds: timeTaken,
         });
 
@@ -283,7 +293,7 @@ export const ChatProvider = ({ children, template }) => {
           : 30;
 
         await submitAnswer(currentConversation.id, {
-          user_answer: "", // Empty answer indicates no response
+          user_answer: normalizeUserAnswer(""), // Will return "No answer provided"
           time_taken_seconds: timeTaken,
         });
 
@@ -325,7 +335,7 @@ export const ChatProvider = ({ children, template }) => {
           : 0;
 
         await submitAnswer(currentConversation.id, {
-          user_answer: "", // Empty answer indicates intentional skip
+          user_answer: normalizeUserAnswer(""), // Will return "No answer provided"
           time_taken_seconds: timeTaken,
         });
 

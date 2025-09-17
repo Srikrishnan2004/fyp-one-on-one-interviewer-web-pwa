@@ -168,7 +168,9 @@ export const UserDashboard = ({ onClose }) => {
                     Total Sessions
                   </h3>
                   <p className="text-2xl font-bold text-blue-600">
-                    {sessionSummary?.total_sessions || 0}
+                    {sessionSummary?.total_sessions
+                      ? Number(sessionSummary.total_sessions)
+                      : 0}
                   </p>
                 </div>
                 <div className="bg-green-50 p-4 rounded-lg">
@@ -176,7 +178,9 @@ export const UserDashboard = ({ onClose }) => {
                     Completed
                   </h3>
                   <p className="text-2xl font-bold text-green-600">
-                    {sessionSummary?.completed_sessions || 0}
+                    {sessionSummary?.completed_sessions
+                      ? Number(sessionSummary.completed_sessions)
+                      : 0}
                   </p>
                 </div>
                 <div className="bg-purple-50 p-4 rounded-lg">
@@ -185,7 +189,7 @@ export const UserDashboard = ({ onClose }) => {
                   </h3>
                   <p className="text-2xl font-bold text-purple-600">
                     {sessionSummary?.avg_duration
-                      ? `${Math.round(sessionSummary.avg_duration)}min`
+                      ? `${Math.round(Number(sessionSummary.avg_duration))}min`
                       : "0min"}
                   </p>
                 </div>
@@ -194,34 +198,55 @@ export const UserDashboard = ({ onClose }) => {
                     Questions Answered
                   </h3>
                   <p className="text-2xl font-bold text-orange-600">
-                    {sessionSummary?.total_questions_answered || 0}
+                    {sessionSummary?.total_questions_answered
+                      ? Number(sessionSummary.total_questions_answered)
+                      : 0}
                   </p>
                 </div>
               </div>
 
               {/* Performance Overview */}
-              {performanceSummary && performanceSummary.length > 0 && (
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Performance Overview
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {performanceSummary.slice(0, 3).map((metric, index) => (
-                      <div key={index} className="bg-white p-3 rounded border">
-                        <h4 className="font-medium text-gray-700">
-                          {metric.metric_type}
-                        </h4>
-                        <p className="text-lg font-bold text-blue-600">
-                          {metric.avg_score?.toFixed(1)}%
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {metric.total_records} records
-                        </p>
-                      </div>
-                    ))}
+              {performanceSummary &&
+                (Array.isArray(performanceSummary)
+                  ? performanceSummary.length > 0
+                  : Object.keys(performanceSummary).length > 0) && (
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                      Performance Overview
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {(Array.isArray(performanceSummary)
+                        ? performanceSummary
+                        : Object.values(performanceSummary)
+                      )
+                        .slice(0, 3)
+                        .map((metric, index) => (
+                          <div
+                            key={index}
+                            className="bg-white p-3 rounded border"
+                          >
+                            <h4 className="font-medium text-gray-700">
+                              {metric.metric_type}
+                            </h4>
+                            <p className="text-lg font-bold text-blue-600">
+                              {metric.avg_score
+                                ? Number(metric.avg_score).toFixed(1)
+                                : "0.0"}
+                              {metric.metric_type === "response_time"
+                                ? "s"
+                                : "%"}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {metric.total_records
+                                ? Number(metric.total_records)
+                                : 0}{" "}
+                              records
+                            </p>
+                          </div>
+                        ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
             </div>
           )}
 
@@ -281,13 +306,19 @@ export const UserDashboard = ({ onClose }) => {
               <h3 className="text-lg font-semibold text-gray-900">
                 Performance Metrics
               </h3>
-              {!performanceSummary || performanceSummary.length === 0 ? (
+              {!performanceSummary ||
+              (Array.isArray(performanceSummary)
+                ? performanceSummary.length === 0
+                : Object.keys(performanceSummary).length === 0) ? (
                 <p className="text-gray-500 text-center py-8">
                   No performance data available
                 </p>
               ) : (
                 <div className="space-y-3">
-                  {performanceSummary.map((metric, index) => (
+                  {(Array.isArray(performanceSummary)
+                    ? performanceSummary
+                    : Object.values(performanceSummary)
+                  ).map((metric, index) => (
                     <div key={index} className="border rounded-lg p-4">
                       <div className="flex justify-between items-center">
                         <div>
@@ -300,11 +331,22 @@ export const UserDashboard = ({ onClose }) => {
                         </div>
                         <div className="text-right">
                           <p className="text-lg font-bold text-blue-600">
-                            {metric.avg_score?.toFixed(1)}%
+                            {metric.avg_score
+                              ? Number(metric.avg_score).toFixed(1)
+                              : "0.0"}
+                            {metric.metric_type === "response_time" ? "s" : "%"}
                           </p>
                           <p className="text-xs text-gray-500">
-                            Range: {metric.min_score?.toFixed(1)}% -{" "}
-                            {metric.max_score?.toFixed(1)}%
+                            Range:{" "}
+                            {metric.min_score
+                              ? Number(metric.min_score).toFixed(1)
+                              : "0.0"}
+                            {metric.metric_type === "response_time" ? "s" : "%"}{" "}
+                            -{" "}
+                            {metric.max_score
+                              ? Number(metric.max_score).toFixed(1)
+                              : "0.0"}
+                            {metric.metric_type === "response_time" ? "s" : "%"}
                           </p>
                         </div>
                       </div>
@@ -312,7 +354,21 @@ export const UserDashboard = ({ onClose }) => {
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
                             className="bg-blue-600 h-2 rounded-full"
-                            style={{ width: `${metric.avg_score}%` }}
+                            style={{
+                              width: `${Math.min(
+                                100,
+                                Math.max(
+                                  0,
+                                  metric.metric_type === "response_time"
+                                    ? metric.avg_score
+                                      ? (Number(metric.avg_score) / 120) * 100
+                                      : 0 // Normalize response time to 120s max
+                                    : metric.avg_score
+                                    ? Number(metric.avg_score)
+                                    : 0
+                                )
+                              )}%`,
+                            }}
                           ></div>
                         </div>
                       </div>
