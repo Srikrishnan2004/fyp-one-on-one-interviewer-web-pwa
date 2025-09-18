@@ -308,7 +308,7 @@ export const SessionProvider = ({ children }) => {
   const getSessionConversations = async (sessionId) => {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/conversations/session/${sessionId}`,
+        `${API_BASE_URL}/conversations?sessionId=${sessionId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
