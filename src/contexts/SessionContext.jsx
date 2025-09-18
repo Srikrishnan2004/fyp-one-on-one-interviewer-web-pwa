@@ -380,6 +380,30 @@ export const SessionProvider = ({ children }) => {
     }
   };
 
+  const getSessionPerformance = async (sessionId) => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/performance?sessionId=${sessionId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.success) {
+        return { success: true, performance: data.data };
+      } else {
+        return { success: false, message: data.message };
+      }
+    } catch (error) {
+      console.error("Error fetching session performance:", error);
+      return { success: false, message: "Network error. Please try again." };
+    }
+  };
+
   const value = {
     currentSession,
     sessionHistory,
@@ -400,6 +424,7 @@ export const SessionProvider = ({ children }) => {
     getSessionConversations,
     createPerformanceRecord,
     getPerformanceSummary,
+    getSessionPerformance,
     setCurrentSession,
   };
 

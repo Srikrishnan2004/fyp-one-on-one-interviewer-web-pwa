@@ -38,6 +38,7 @@ export const ChatProvider = ({ children, template }) => {
     createConversation,
     submitAnswer,
     createPerformanceRecord,
+    getSessionPerformance,
     currentSession,
     setCurrentSession,
   } = useSession();
@@ -59,6 +60,7 @@ export const ChatProvider = ({ children, template }) => {
   const [isProcessingQuestion, setIsProcessingQuestion] = useState(false);
   const [currentConversation, setCurrentConversation] = useState(null);
   const [answerStartTime, setAnswerStartTime] = useState(null);
+  const [sessionPerformance, setSessionPerformance] = useState(null);
 
   // Initialize interview on load
   useEffect(() => {
@@ -409,6 +411,17 @@ export const ChatProvider = ({ children, template }) => {
                 improvement_suggestions:
                   "Great job completing the full interview!",
               });
+
+              // Fetch session performance data from backend
+              console.log("Fetching session performance for session:", currentSession.id);
+              const performanceResult = await getSessionPerformance(currentSession.id);
+              
+              if (performanceResult.success) {
+                console.log("Session performance fetched:", performanceResult.performance);
+                setSessionPerformance(performanceResult.performance);
+              } else {
+                console.error("Failed to fetch session performance:", performanceResult.message);
+              }
             } catch (error) {
               console.error("Error ending session:", error);
             }
@@ -486,6 +499,8 @@ export const ChatProvider = ({ children, template }) => {
         userAnswer,
         setUserAnswer,
         skipCurrentQuestion,
+        sessionPerformance,
+        currentSession,
       }}
     >
       {children}
