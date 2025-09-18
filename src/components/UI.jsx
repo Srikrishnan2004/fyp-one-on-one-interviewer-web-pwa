@@ -63,7 +63,7 @@ export const UI = ({ hidden, ...props }) => {
                   {waitingForAnswer && !preparationPhase && (
                     <div className="space-y-2">
                       <div className="text-orange-600 font-medium">
-                        ⏰ Speak your answer... (5s timeout)
+                        🎤 Speak your answer...
                       </div>
                       <button
                         onClick={skipCurrentQuestion}

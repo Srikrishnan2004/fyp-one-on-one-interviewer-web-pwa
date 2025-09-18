@@ -54,7 +54,7 @@ export const ChatProvider = ({ children, template }) => {
   const [userAnswer, setUserAnswer] = useState("");
   const [preparationPhase, setPreparationPhase] = useState(false);
   const [preparationTimeout, setPreparationTimeout] = useState(null);
-  const [speakingTimeout, setSpeakingTimeout] = useState(null);
+  // Removed speakingTimeout - user controls when to send answer
   const [isUserSpeaking, setIsUserSpeaking] = useState(false);
   const [isProcessingQuestion, setIsProcessingQuestion] = useState(false);
   const [currentConversation, setCurrentConversation] = useState(null);
@@ -162,6 +162,8 @@ export const ChatProvider = ({ children, template }) => {
   const chat = async (message) => {
     if (!message?.trim() || isProcessingQuestion) return;
 
+    console.log("Chat function called with message:", message);
+
     // If user starts speaking during preparation phase, end it early
     if (preparationPhase) {
       if (preparationTimeout) {
@@ -171,24 +173,24 @@ export const ChatProvider = ({ children, template }) => {
       endPreparationPhase();
     }
 
-    // If user is speaking, reset the speaking timer
-    if (isUserSpeaking && speakingTimeout) {
-      clearTimeout(speakingTimeout);
-      startSpeakingTimer();
-    }
-
     // Set user as speaking and store the answer
     setIsUserSpeaking(true);
     setUserAnswer(message);
+    setIsProcessingQuestion(true); // Prevent timeout from interfering
 
-    // Record the time taken to answer
+    // Record the time taken to answer (convert to integer as backend expects)
     const timeTaken = answerStartTime
-      ? (Date.now() - answerStartTime) / 1000
+      ? Math.round((Date.now() - answerStartTime) / 1000)
       : 30;
 
     // Submit the answer to the backend if we have a current conversation
     if (currentConversation && currentSession) {
       try {
+        console.log("Submitting answer:", {
+          user_answer: normalizeUserAnswer(message),
+          time_taken_seconds: timeTaken,
+        });
+
         await submitAnswer(currentConversation.id, {
           user_answer: normalizeUserAnswer(message),
           time_taken_seconds: timeTaken,
@@ -249,7 +251,6 @@ export const ChatProvider = ({ children, template }) => {
 
     // Clear any existing timeouts
     if (preparationTimeout) clearTimeout(preparationTimeout);
-    if (speakingTimeout) clearTimeout(speakingTimeout);
 
     // Start 10-second preparation timer
     const timeout = setTimeout(() => {
@@ -265,65 +266,12 @@ export const ChatProvider = ({ children, template }) => {
     setIsUserSpeaking(false);
     setAnswerStartTime(Date.now()); // Record when the user can start answering
 
-    // Start 5-second speaking timer
-    startSpeakingTimer();
+    // No automatic timeout - user controls when to send answer
   };
 
-  const startSpeakingTimer = () => {
-    // Clear any existing timeout
-    if (speakingTimeout) {
-      clearTimeout(speakingTimeout);
-    }
+  // Removed automatic speaking timer - user controls when to send answer
 
-    // Set 5 second timeout for user to continue speaking
-    const timeout = setTimeout(() => {
-      handleSpeakingTimeout();
-    }, 5000);
-
-    setSpeakingTimeout(timeout);
-  };
-
-  const handleSpeakingTimeout = async () => {
-    // User didn't continue speaking within 5 seconds
-    // Submit empty answer to track that question was presented but not answered
-    if (!isProcessingQuestion && currentConversation && currentSession) {
-      try {
-        const timeTaken = answerStartTime
-          ? (Date.now() - answerStartTime) / 1000
-          : 30;
-
-        await submitAnswer(currentConversation.id, {
-          user_answer: normalizeUserAnswer(""), // Will return "No answer provided"
-          time_taken_seconds: timeTaken,
-        });
-
-        // Update session progress
-        await updateQuestionCount(
-          currentSession.id,
-          interviewQuestions.length,
-          currentQuestionIndex + 1
-        );
-
-        // Create performance record for skipped question
-        await createPerformanceRecord({
-          session_id: currentSession.id,
-          conversation_id: currentConversation.id,
-          metric_type: "response_time",
-          metric_value: timeTaken,
-          metric_max_value: 120.0,
-          metric_unit: "seconds",
-          performance_category: "engagement",
-          feedback_notes: "Question was skipped - no answer provided",
-          improvement_suggestions: "Try to provide an answer even if unsure",
-        });
-      } catch (error) {
-        console.error("Error submitting empty answer:", error);
-      }
-    }
-
-    // Move to next question
-    await moveToNextQuestion();
-  };
+  // Removed handleSpeakingTimeout - no automatic timeout needed
 
   const skipCurrentQuestion = async () => {
     // Allow users to manually skip a question
@@ -331,7 +279,7 @@ export const ChatProvider = ({ children, template }) => {
       try {
         setIsProcessingQuestion(true);
         const timeTaken = answerStartTime
-          ? (Date.now() - answerStartTime) / 1000
+          ? Math.round((Date.now() - answerStartTime) / 1000)
           : 0;
 
         await submitAnswer(currentConversation.id, {
@@ -413,7 +361,7 @@ export const ChatProvider = ({ children, template }) => {
 
           setMessages((prevMessages) => [...prevMessages, nextQuestionMessage]);
           setCurrentQuestionIndex(nextQuestionIndex);
-          setWaitingForAnswer(false);
+          setIsProcessingQuestion(false); // Allow new question to be processed
         }, 2000); // 2 second delay before next question
       } else {
         // Interview completed - end session and show completion
@@ -473,10 +421,6 @@ export const ChatProvider = ({ children, template }) => {
         clearTimeout(preparationTimeout);
         setPreparationTimeout(null);
       }
-      if (speakingTimeout) {
-        clearTimeout(speakingTimeout);
-        setSpeakingTimeout(null);
-      }
     }
   };
 
@@ -494,11 +438,8 @@ export const ChatProvider = ({ children, template }) => {
       if (preparationTimeout) {
         clearTimeout(preparationTimeout);
       }
-      if (speakingTimeout) {
-        clearTimeout(speakingTimeout);
-      }
     };
-  }, [preparationTimeout, speakingTimeout]);
+  }, [preparationTimeout]);
 
   return (
     <ChatContext.Provider
