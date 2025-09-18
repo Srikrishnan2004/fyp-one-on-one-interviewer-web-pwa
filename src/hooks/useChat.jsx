@@ -413,14 +413,36 @@ export const ChatProvider = ({ children, template }) => {
               });
 
               // Fetch session performance data from backend
-              console.log("Fetching session performance for session:", currentSession.id);
-              const performanceResult = await getSessionPerformance(currentSession.id);
-              
+              console.log(
+                "Fetching session performance for session:",
+                currentSession.id
+              );
+              const performanceResult = await getSessionPerformance(
+                currentSession.id
+              );
+
               if (performanceResult.success) {
-                console.log("Session performance fetched:", performanceResult.performance);
+                console.log(
+                  "Session performance fetched successfully:",
+                  performanceResult.performance
+                );
+                console.log(
+                  "Performance data structure:",
+                  JSON.stringify(performanceResult.performance, null, 2)
+                );
                 setSessionPerformance(performanceResult.performance);
               } else {
-                console.error("Failed to fetch session performance:", performanceResult.message);
+                console.error(
+                  "Failed to fetch session performance:",
+                  performanceResult.message
+                );
+                // Set a fallback performance object to show something
+                setSessionPerformance({
+                  summary: [],
+                  metrics: [],
+                  conversations: [],
+                  message: "Performance data unavailable",
+                });
               }
             } catch (error) {
               console.error("Error ending session:", error);

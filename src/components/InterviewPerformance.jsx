@@ -15,6 +15,43 @@ export const InterviewPerformance = () => {
     );
   }
 
+  // Handle case where performance data is unavailable
+  if (sessionPerformance.message === "Performance data unavailable") {
+    return (
+      <div className="bg-white rounded-lg shadow-lg p-6 max-w-4xl mx-auto">
+        <div className="text-center">
+          <div className="text-yellow-600 text-6xl mb-4">⚠️</div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">
+            Performance Data Unavailable
+          </h2>
+          <p className="text-gray-600 mb-6">
+            We couldn't retrieve your performance data at this time. This might
+            be because:
+          </p>
+          <ul className="text-left text-gray-600 mb-6 space-y-2">
+            <li>• The session is still being processed</li>
+            <li>• There was a temporary server issue</li>
+            <li>• The performance data hasn't been generated yet</li>
+          </ul>
+          <div className="flex justify-center space-x-4">
+            <button
+              onClick={() => (window.location.href = "/")}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Back to Home
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-lg shadow-lg p-6 max-w-4xl mx-auto">
       <div className="mb-6">
@@ -28,23 +65,32 @@ export const InterviewPerformance = () => {
       </div>
 
       {/* Overall Performance Summary */}
-      {sessionPerformance.summary && (
+      {(sessionPerformance.summary || sessionPerformance.metrics) && (
         <div className="mb-8">
           <h3 className="text-xl font-semibold text-gray-800 mb-4">
             Overall Performance Summary
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {sessionPerformance.summary.map((metric, index) => (
+            {(
+              sessionPerformance.summary ||
+              sessionPerformance.metrics ||
+              []
+            ).map((metric, index) => (
               <div key={index} className="bg-gray-50 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-gray-600 capitalize">
-                    {metric.metric_type?.replace(/_/g, " ")}
+                    {metric.metric_type?.replace(/_/g, " ") || "Performance"}
                   </span>
                   <span className="text-lg font-bold text-blue-600">
-                    {metric.avg_score
-                      ? Number(metric.avg_score).toFixed(1)
+                    {metric.avg_score || metric.metric_value
+                      ? Number(metric.avg_score || metric.metric_value).toFixed(
+                          1
+                        )
                       : "0.0"}
-                    {metric.metric_type === "response_time" ? "s" : "%"}
+                    {metric.metric_type === "response_time" ||
+                    metric.metric_unit === "seconds"
+                      ? "s"
+                      : "%"}
                   </span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
@@ -55,12 +101,17 @@ export const InterviewPerformance = () => {
                         100,
                         Math.max(
                           0,
-                          metric.metric_type === "response_time"
-                            ? metric.avg_score
-                              ? (Number(metric.avg_score) / 120) * 100
+                          metric.metric_type === "response_time" ||
+                            metric.metric_unit === "seconds"
+                            ? metric.avg_score || metric.metric_value
+                              ? (Number(
+                                  metric.avg_score || metric.metric_value
+                                ) /
+                                  120) *
+                                100
                               : 0
-                            : metric.avg_score
-                            ? Number(metric.avg_score)
+                            : metric.avg_score || metric.metric_value
+                            ? Number(metric.avg_score || metric.metric_value)
                             : 0
                         )
                       )}%`,
@@ -68,7 +119,7 @@ export const InterviewPerformance = () => {
                   ></div>
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  {metric.total_records} records
+                  {metric.total_records || 1} records
                 </p>
               </div>
             ))}
@@ -159,14 +210,19 @@ export const InterviewPerformance = () => {
       )}
 
       {/* Conversations/Answers */}
-      {sessionPerformance.conversations &&
-        sessionPerformance.conversations.length > 0 && (
+      {(sessionPerformance.conversations || sessionPerformance.questions) &&
+        (sessionPerformance.conversations?.length > 0 ||
+          sessionPerformance.questions?.length > 0) && (
           <div className="mb-8">
             <h3 className="text-xl font-semibold text-gray-800 mb-4">
               Question & Answer Review
             </h3>
             <div className="space-y-4">
-              {sessionPerformance.conversations.map((conversation, index) => (
+              {(
+                sessionPerformance.conversations ||
+                sessionPerformance.questions ||
+                []
+              ).map((conversation, index) => (
                 <div
                   key={index}
                   className="border border-gray-200 rounded-lg p-4"
@@ -189,10 +245,13 @@ export const InterviewPerformance = () => {
                       </span>
                     </div>
                     <p className="text-gray-800 font-medium mb-2">
-                      {conversation.question_text}
+                      {conversation.question_text || conversation.question}
                     </p>
                     <p className="text-sm text-gray-600">
-                      Category: {conversation.question_category || "General"}
+                      Category:{" "}
+                      {conversation.question_category ||
+                        conversation.category ||
+                        "General"}
                     </p>
                   </div>
 
@@ -203,9 +262,13 @@ export const InterviewPerformance = () => {
                     <p className="text-gray-800">
                       {conversation.user_answer || "No answer provided"}
                     </p>
-                    {conversation.time_taken_seconds && (
+                    {(conversation.time_taken_seconds ||
+                      conversation.time_taken) && (
                       <p className="text-xs text-gray-500 mt-1">
-                        Response time: {conversation.time_taken_seconds}s
+                        Response time:{" "}
+                        {conversation.time_taken_seconds ||
+                          conversation.time_taken}
+                        s
                       </p>
                     )}
                   </div>
