@@ -160,9 +160,28 @@ export const ChatProvider = ({ children, template }) => {
   };
 
   const chat = async (message) => {
-    if (!message?.trim() || isProcessingQuestion) return;
+    console.log(
+      "Chat function entry - message:",
+      message,
+      "isProcessingQuestion:",
+      isProcessingQuestion
+    );
 
-    console.log("Chat function called with message:", message);
+    // Allow messages during preparation phase (early answers) or when waiting for answer
+    const shouldBlock =
+      !message?.trim() || (isProcessingQuestion && !preparationPhase);
+
+    if (shouldBlock) {
+      console.log("Chat function blocked - reason:", {
+        noMessage: !message?.trim(),
+        isProcessing: isProcessingQuestion,
+        inPreparation: preparationPhase,
+        messageValue: message,
+      });
+      return;
+    }
+
+    console.log("Chat function proceeding with message:", message);
 
     // If user starts speaking during preparation phase, end it early
     if (preparationPhase) {
@@ -186,15 +205,20 @@ export const ChatProvider = ({ children, template }) => {
     // Submit the answer to the backend if we have a current conversation
     if (currentConversation && currentSession) {
       try {
-        console.log("Submitting answer:", {
-          user_answer: normalizeUserAnswer(message),
-          time_taken_seconds: timeTaken,
-        });
+        const normalizedAnswer = normalizeUserAnswer(message);
+        console.log("Raw message:", message);
+        console.log("Normalized answer:", normalizedAnswer);
+        console.log("Message type:", typeof message);
+        console.log("Message length:", message?.length);
 
-        await submitAnswer(currentConversation.id, {
-          user_answer: normalizeUserAnswer(message),
+        const answerPayload = {
+          user_answer: normalizedAnswer,
           time_taken_seconds: timeTaken,
-        });
+        };
+
+        console.log("Submitting answer payload:", answerPayload);
+
+        await submitAnswer(currentConversation.id, answerPayload);
 
         // Update session progress
         await updateQuestionCount(
@@ -264,6 +288,7 @@ export const ChatProvider = ({ children, template }) => {
     setPreparationPhase(false);
     setWaitingForAnswer(true);
     setIsUserSpeaking(false);
+    setIsProcessingQuestion(false); // ✅ Allow user to answer
     setAnswerStartTime(Date.now()); // Record when the user can start answering
 
     // No automatic timeout - user controls when to send answer

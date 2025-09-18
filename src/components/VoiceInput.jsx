@@ -130,14 +130,16 @@ export const VoiceInput = () => {
     }
 
     // Send the transcribed text to backend if we have any and we're waiting for an answer or in preparation phase
-    if (currentTranscript && (waitingForAnswer || preparationPhase)) {
+    const canSend = currentTranscript && (waitingForAnswer || preparationPhase);
+    console.log("VoiceInput condition check:", {
+      currentTranscript: currentTranscript,
+      waitingForAnswer: waitingForAnswer,
+      preparationPhase: preparationPhase,
+      canSend: canSend,
+    });
+
+    if (canSend) {
       console.log("VoiceInput sending transcript:", currentTranscript);
-      console.log(
-        "State - waitingForAnswer:",
-        waitingForAnswer,
-        "preparationPhase:",
-        preparationPhase
-      );
       chat(currentTranscript);
 
       // Clean up after sending

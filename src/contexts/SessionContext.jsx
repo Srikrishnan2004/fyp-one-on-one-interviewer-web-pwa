@@ -262,6 +262,12 @@ export const SessionProvider = ({ children }) => {
 
   const submitAnswer = async (conversationId, answerData) => {
     try {
+      console.log("SessionContext submitAnswer called with:", {
+        conversationId,
+        answerData,
+      });
+      console.log("Request body will be:", JSON.stringify(answerData));
+
       const response = await fetch(
         `${API_BASE_URL}/conversations/${conversationId}/answer`,
         {
